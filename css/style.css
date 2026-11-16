@@ -1,0 +1,761 @@
+/* ==========================================================================
+   Design School is a Game
+   Look: a warm paper background, a pixel display face for headlines, a monospace for everything else,
+   pill buttons and soft, layered shadows.
+   UI colors are drawn from the card palette (Figma color styles) so the
+   page complements whichever card is dealt.
+   The card is laid out in Figma px (334 × 468) scaled with --u so the
+   on-screen card and the exported PNG (js/app.js → drawCard) share geometry.
+   ========================================================================== */
+
+/* Card fonts (project files). UI fonts are set separately below. */
+@font-face {
+  font-family: "PicNic";
+  src: url("../webfonts/PicNic-Regular.woff2") format("woff2"),
+       url("../webfonts/PicNic-Regular.woff") format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Squarevetica";
+  src: url("../webfonts/Squarevetica-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Card palette (Figma color styles) */
+  --warm-cream: #faebce;
+  --sand-beige: #cbc1a6;
+  --antique-gold: #c7a565;
+  --bright-orchid: #fe7efe;
+  --muted-citron: #d7d36f;
+  --midnight-navy: #2b2d43;
+  --slate-violet: #616595;
+  --burnt-orange: #be4d17;
+
+  /* Roles */
+  --bg: #fbf3e2;               /* paper: a step lighter than Warm Cream so cream canvases still read */
+  --surface: #fffaf1;
+  --surface-2: #f6ecd8;
+  --surface-hover: #f1e4ca;
+  --text: var(--midnight-navy);
+  --text-2: #3d3f58;
+  --muted: var(--slate-violet);  /* 5.0:1 on --bg */
+  --line: rgb(43 45 67 / 0.12);
+  --primary: var(--midnight-navy);
+  --primary-ink: var(--warm-cream);
+  --focus: var(--burnt-orange);
+  --on: var(--slate-violet);
+  --error: #a43f10;            /* Burnt Orange darkened to pass 4.5:1 on paper */
+  --tag: var(--muted-citron);
+  --tag-ink: var(--midnight-navy);
+  --select: color-mix(in oklab, var(--muted-citron) 55%, var(--surface));
+  --note: color-mix(in oklab, var(--sand-beige) 55%, var(--surface));
+  --warn: color-mix(in oklab, var(--burnt-orange) 22%, var(--surface));
+
+  /* Elevation: soft, deep, multi-layered */
+  --shadow-subtle: rgb(43 45 67 / 0.08) 0 1px 3px 0, rgb(43 45 67 / 0.06) 0 1px 2px -1px;
+  --shadow-sm: rgb(43 45 67 / 0.08) 0 4px 6px -1px, rgb(43 45 67 / 0.06) 0 2px 4px -2px;
+  --shadow-md: rgb(43 45 67 / 0.1) 0 12px 12px 2px, rgb(43 45 67 / 0.06) 0 2px 4px -1px;
+  --shadow-xl: rgb(43 45 67 / 0.01) 0 50px 40px 0, rgb(43 45 67 / 0.02) 0 50px 40px 0,
+               rgb(43 45 67 / 0.05) 0 20px 40px 0, rgb(43 45 67 / 0.08) 0 3px 10px 0;
+  --img-outline: oklch(0 0 0 / 0.1);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Type */
+  --display: "Bitcount Prop Double", ui-monospace, Menlo, monospace;
+  --body: "Kode Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* Radii: group 24 = control 14 + padding 10 where nested */
+  --r-control: 14px;
+  --r-group: 24px;
+  --r-pill: 6px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1d2b;
+    --surface: var(--midnight-navy);
+    --surface-2: #34364f;
+    --surface-hover: #3d3f5b;
+    --text: var(--warm-cream);
+    --text-2: #e4d8bd;
+    --muted: var(--sand-beige);
+    --line: rgb(250 235 206 / 0.12);
+    --primary: var(--warm-cream);
+    --primary-ink: var(--midnight-navy);
+    --focus: var(--muted-citron);
+    --on: var(--bright-orchid);
+    --error: #f08a5d;
+    --select: color-mix(in oklab, var(--slate-violet) 55%, var(--surface));
+    --note: color-mix(in oklab, var(--slate-violet) 40%, var(--surface));
+    --warn: color-mix(in oklab, var(--burnt-orange) 35%, var(--surface));
+    --shadow-subtle: 0 0 0 1px rgb(250 235 206 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-sm: 0 0 0 1px rgb(250 235 206 / 0.07), 0 2px 6px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 0 0 1px rgb(250 235 206 / 0.07), 0 12px 20px rgb(0 0 0 / 0.4);
+    --shadow-xl: 0 0 0 1px rgb(250 235 206 / 0.06), 0 20px 40px rgb(0 0 0 / 0.45);
+    --img-outline: oklch(1 0 0 / 0.1);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1c1d2b;
+  --surface: var(--midnight-navy);
+  --surface-2: #34364f;
+  --surface-hover: #3d3f5b;
+  --text: var(--warm-cream);
+  --text-2: #e4d8bd;
+  --muted: var(--sand-beige);
+  --line: rgb(250 235 206 / 0.12);
+  --primary: var(--warm-cream);
+  --primary-ink: var(--midnight-navy);
+  --focus: var(--muted-citron);
+  --on: var(--bright-orchid);
+  --error: #f08a5d;
+  --select: color-mix(in oklab, var(--slate-violet) 55%, var(--surface));
+  --note: color-mix(in oklab, var(--slate-violet) 40%, var(--surface));
+  --warn: color-mix(in oklab, var(--burnt-orange) 35%, var(--surface));
+  --shadow-subtle: 0 0 0 1px rgb(250 235 206 / 0.06), 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 0 0 1px rgb(250 235 206 / 0.07), 0 2px 6px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 0 0 1px rgb(250 235 206 / 0.07), 0 12px 20px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 0 0 1px rgb(250 235 206 / 0.06), 0 20px 40px rgb(0 0 0 / 0.45);
+  --img-outline: oklch(1 0 0 / 0.1);
+  color-scheme: dark;
+}
+
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 400 16px/1.5 var(--body);
+  letter-spacing: 0;
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, legend { text-wrap: balance; }
+p { text-wrap: pretty; }
+
+[hidden] { display: none !important; }
+
+.num { font-variant-numeric: tabular-nums; }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.link-quiet {
+  color: var(--muted);
+  font-size: 14px;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+  transition: color 150ms var(--ease), text-decoration-color 150ms var(--ease);
+  padding: 12px 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.link-quiet:hover { color: var(--text); text-decoration-color: currentColor; }
+
+/* ───────── Screens ───────── */
+.screen:not([hidden]) { animation: screen-in 320ms var(--ease); }
+@keyframes screen-in {
+  from { opacity: 0; translate: 0 10px; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* Display face only at headline sizes (≥ 24px) */
+.screen-title {
+  margin: 0;
+  font: 400 clamp(36px, 7vw, 56px)/1.05 var(--display);
+  letter-spacing: 0;
+  outline: none;
+}
+.lede { margin: 0; color: var(--text-2); font-size: 17px; line-height: 1.5; max-width: 46ch; }
+
+/* Eyebrow reads as a pastel tag stuck on the page */
+.eyebrow {
+  justify-self: start;
+  margin: 0;
+  padding: 5px 12px;
+  border-radius: var(--r-pill);
+  background: var(--tag);
+  color: var(--tag-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.quiz-wrap {
+  display: grid;
+  gap: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 56px 16px 96px;
+}
+/* Home page: content sits in the middle of the window */
+[data-screen="intro"]:not([hidden]) {
+  display: grid;
+  align-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* The fan above the title is taller than the text below it, which pushed the
+   title under the middle. Extra space at the bottom lifts the block so the title
+   lands about 45% down the window (optical center); it shrinks on short windows. */
+.intro { width: 100%; justify-items: center; text-align: center; padding-block: 40px calc(40px + min(180px, 20vh)); }
+.intro .lede { text-wrap: balance; }
+.intro .screen-title { font-size: clamp(44px, 9vw, 66px); line-height: 1.05; }
+
+/* Decorative fan of mini cards on the intro */
+.fan {
+  position: relative;
+  width: 220px;
+  height: 190px;
+  margin-bottom: 16px;
+}
+.fan span {
+  position: absolute;
+  left: 50%; bottom: 0;
+  width: 96px; height: 134px;   /* 334 × 468 at ~0.29 scale */
+  margin-left: -48px;
+  border: 1px solid var(--c-border);
+  border-radius: 3px;
+  /* Canvas and description box, drawn as two inset panels */
+  background:
+    linear-gradient(var(--c-canvas), var(--c-canvas)) 4px 4px / calc(100% - 8px) 78px no-repeat,
+    linear-gradient(var(--c-canvas), var(--c-canvas)) 4px calc(100% - 4px) / calc(100% - 8px) 29px no-repeat,
+    var(--c-bg);
+  box-shadow: 2px 2px 0 0 var(--midnight-navy), var(--shadow-xl);
+  transform-origin: 50% 120%;
+}
+.fan span:nth-child(1) { rotate: -16deg; translate: -14px 0; }
+.fan span:nth-child(2) { rotate: 0deg; translate: 0 -10px; z-index: 1; }
+.fan span:nth-child(3) { rotate: 16deg; translate: 14px 0; }
+
+.progress { display: grid; gap: 10px; font-size: 14px; font-weight: 500; color: var(--muted); }
+/* One segment per question. The visible bar is 6px; the button around it
+   is 24px tall (44px on touch screens) so it's easy to hit. */
+.progress-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: -9px 0;
+  padding: 0;
+  list-style: none;
+}
+.progress-step {
+  display: block;
+  width: 100%;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.progress-step::before {
+  content: "";
+  display: block;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--text) 12%, transparent);
+  transition: background-color 150ms var(--ease), scale 150ms var(--ease);
+}
+.progress-step[data-state="done"]::before,
+.progress-step[data-state="current"]::before { background: var(--text); }
+.progress-step[data-state="reached"]::before { background: color-mix(in oklab, var(--text) 40%, transparent); }
+.progress-step:disabled { cursor: default; }
+@media (hover: hover) {
+  .progress-step:not(:disabled):hover::before { background: var(--slate-violet); scale: 1 1.6; }
+}
+.progress-step:not(:disabled):active::before { scale: 0.96 1.6; }
+@media (pointer: coarse) {
+  .progress-step { height: 44px; }
+  .progress-steps { margin: -19px 0; }
+}
+
+.options { display: grid; gap: 12px; }
+.option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 64px;
+  padding: 16px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-xl);
+  font: 500 16px/1.4 var(--body);
+  letter-spacing: 0;
+  text-align: left;
+  cursor: pointer;
+  transition-property: scale, background-color, box-shadow, translate;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease);
+}
+@media (hover: hover) {
+  .option:hover { translate: 0 -2px; box-shadow: var(--shadow-md); }
+}
+.option:active { scale: 0.96; translate: 0 0; }
+.option[aria-checked="true"] {
+  background: var(--select);
+  box-shadow: inset 0 0 0 2px var(--text), var(--shadow-xl);
+}
+.option-dot {
+  flex: none;
+  width: 20px; height: 20px;
+  border-radius: 50%;            /* always a circle: reads as "pick one" */
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--text) 35%, transparent);
+  transition: box-shadow 150ms var(--ease);
+}
+.option[aria-checked="true"] .option-dot { box-shadow: inset 0 0 0 6px var(--text); }
+
+.quiz-nav { display: flex; justify-content: space-between; gap: 12px; }
+.quiz-nav .btn { min-width: 104px; }
+
+#nameInput { min-height: 56px; font-size: 18px; padding: 14px 18px; background: var(--surface); box-shadow: var(--shadow-xl), inset 0 0 0 1px var(--line); }
+.hint { margin: -8px 0 0; min-height: 1.4em; color: var(--error); font-size: 14px; }
+.field-hint { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+
+.cam-icon {
+  width: 64px; height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: var(--slate-violet);
+  color: var(--warm-cream);
+  box-shadow: var(--shadow-xl);
+  rotate: -4deg;
+}
+.cam-icon svg {
+  width: 30px; height: 30px;
+  fill: none; stroke: currentColor; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+[data-screen="camera"] .link-quiet { justify-self: center; }
+
+.results-head {
+  display: grid;
+  gap: 12px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 16px 0;
+}
+.start-over { justify-self: start; }
+
+/* ───────── Layout ───────── */
+.layout {
+  display: grid;
+  gap: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 96px;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(340px, 440px) minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+  .stage { position: sticky; top: 24px; }
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.stage-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+.status {
+  min-height: 1.5em;
+  margin: 0;
+  max-width: 40ch;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.status[data-tone="error"] { color: var(--error); }
+
+/* ───────── Buttons: pills ───────── */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 18px;
+  border: 2px solid var(--tag);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--muted), inset 0 0 0 1px;
+  font: 500 15px/1 var(--body);
+  letter-spacing: 0;
+  cursor: pointer;
+  user-select: none;
+  transition-property: scale, background-color, color, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease);
+}
+.btn:hover { background: var(--surface-hover); }
+.btn:active { scale: 0.96; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; scale: 1; }
+.btn svg {
+  width: 18px; height: 18px;
+  fill: none; stroke: currentColor; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round;
+  margin-left: -2px; /* optical: icon side reads heavier than text side */
+}
+.btn-primary { background: var(--primary); color: var(--primary-ink); box-shadow: var(--shadow-sm); }
+.btn-primary:hover { background: var(--primary); box-shadow: var(--shadow-md); }
+.btn-lg { min-height: 50px; padding: 0 26px; font-size: 16px; font-weight: 500; }
+.btn-lg svg { stroke-width: 2; }
+
+/* Make small controls reach a 44px touch target */
+@media (pointer: coarse) {
+  .btn { min-height: 44px; }
+}
+
+:where(button, input, select, textarea, label.btn):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+#upload:focus-visible + * { outline: none; }
+label.btn:has(+ #upload:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ───────── Controls ───────── */
+.controls { display: grid; gap: 20px; min-width: 0; }
+
+.group {
+  margin: 0;
+  padding: 24px;
+  border: 0;
+  border-radius: var(--r-group);
+  background: var(--surface);
+  box-shadow: var(--shadow-xl);
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.group legend {
+  float: left; /* puts legend inside the grid flow */
+  padding: 0;
+  font: 600 18px/1.3 var(--body);
+  letter-spacing: 0;
+}
+.group legend + * { clear: both; }
+
+.row-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+
+.fx-note {
+  justify-self: start;
+  margin: -4px 0 0;
+  padding: 6px 12px;
+  border-radius: var(--r-control);
+  background: var(--note);
+  color: var(--text-2);
+  font-size: 14px;
+}
+.fx-note:empty { display: none; }
+.fx-note[data-tone="warn"] { background: var(--warn); color: var(--text); }
+
+.field { display: grid; gap: 8px; min-width: 0; }
+.field > span:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.field output { color: var(--text); font-weight: 600; }
+.field output.counter { color: var(--muted); font-weight: 400; font-size: 12px; }
+
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 400 16px/1.4 var(--body);
+  letter-spacing: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow 150ms var(--ease), background-color 150ms var(--ease);
+}
+input[type="text"]:hover, input[type="number"]:hover, select:hover, textarea:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--text) 20%, transparent);
+}
+textarea { resize: vertical; }
+
+input[type="range"] {
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Switch */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  width: fit-content;
+}
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track {
+  position: relative;
+  width: 38px; height: 22px;
+  border-radius: var(--r-pill);
+  background: color-mix(in oklab, var(--text) 18%, transparent);
+  transition: background-color 150ms var(--ease);
+  flex: none;
+}
+.switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 16px; height: 16px;
+  border-radius: var(--r-pill);
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: translate 200ms var(--ease);
+}
+.switch input:checked + .switch-track { background: var(--on); }
+.switch input:checked + .switch-track::after { translate: 16px 0; }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ==========================================================================
+   The card — Figma "Final Card Iterations" (Mini-Capstone, node 5:174)
+   Every measurement is in Figma px times --u, so the card scales as one piece.
+   ========================================================================== */
+.card-wrap {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 0 8px 8px 0;         /* room for the 4px hard shadow at any scale */
+  perspective: 1200px;
+}
+@media (max-width: 899px) {
+  .card-wrap { width: min(100%, 380px); }
+}
+
+.card {
+  /* Defaults = The All-Nighter; js/app.js sets these from CARDS */
+  --c-bg: #2b2d43;
+  --c-border: #d7d36f;
+  --c-shadow: #616595;
+  --c-canvas: #616595;
+  --c-canvas-border: #d7d36f;
+  --c-on-canvas: #faebce;
+  --c-title-color: #fe7efe;
+  --title-size: 31;
+  --c-box: #616595;
+  --c-box-border: #d7d36f;
+  --c-body: #faebce;
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 334 / 468;
+  margin: 0;
+}
+
+.card-tilt {
+  --u: calc(100cqw / 334);       /* one Figma px */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+  padding: calc(15 * var(--u));
+  border: calc(2 * var(--u)) solid var(--c-border);
+  border-radius: calc(8 * var(--u));
+  background: var(--c-bg);
+  box-shadow: calc(4 * var(--u)) calc(4 * var(--u)) 0 0 var(--c-shadow);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transform-style: preserve-3d;
+  transition-property: transform, background-color, border-color, box-shadow;
+  transition-duration: 500ms, 300ms, 300ms, 300ms;
+  transition-timing-function: var(--ease);
+  isolation: isolate;
+}
+.card.is-tilting .card-tilt { transition-duration: 120ms, 300ms, 300ms, 300ms; transition-timing-function: linear, var(--ease), var(--ease), var(--ease); }
+
+/* Canvas: the webcam frame (300 × 273) */
+.c-canvas {
+  position: relative;
+  flex: 1 0 0;
+  min-height: 0;
+  overflow: hidden;
+  border: calc(1 * var(--u)) solid var(--c-canvas-border);
+  border-radius: calc(6 * var(--u));
+  background: var(--c-canvas);
+  color: var(--c-on-canvas);
+}
+.c-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* pan first (screen space), then zoom and mirror around the center — js/app.js drawPortraitSource matches this */
+  transform: translate(var(--pan-x, 0%), var(--pan-y, 0%)) scale(var(--zoom, 1)) scaleX(var(--flip, -1));
+  opacity: 0;
+  transition: opacity 250ms var(--ease);
+}
+/* Photo framing: drag / pinch / scroll (js/app.js → Pan + zoom) */
+.c-canvas:not([data-source="none"]) { touch-action: none; cursor: zoom-in; }
+.c-canvas[data-pannable="true"] { cursor: grab; }
+.c-canvas[data-dragging] { cursor: grabbing; }
+.c-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.c-canvas[data-source="live"] #video,
+.c-canvas[data-source="still"] #still { opacity: 1; }
+/* Shaded output sits over the raw media, which shows through until the first frame lands */
+.c-canvas[data-fx="on"]:not([data-source="none"]) .c-fx { opacity: 1; }
+
+.c-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: calc(10 * var(--u));
+  transition: opacity 200ms var(--ease);
+}
+.c-placeholder svg {
+  width: calc(66 * var(--u)); height: calc(66 * var(--u));
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.7;
+}
+.c-canvas:not([data-source="none"]) .c-placeholder { opacity: 0; pointer-events: none; }
+/* Button inverts the Canvas colors so it reads on every card (≥ 4.6:1) */
+.c-placeholder .btn-primary,
+.c-placeholder .btn-primary:hover { background: var(--c-on-canvas); color: var(--c-canvas); }
+
+.c-flash {
+  position: absolute; inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+}
+.c-flash.is-on { animation: flash 450ms ease-out; }
+@keyframes flash { from { opacity: 0.9; } to { opacity: 0; } }
+
+/* Rarity stars, top-right inside the Canvas's 8px padding */
+.c-stars {
+  position: absolute;
+  top: calc(8 * var(--u));
+  right: calc(8 * var(--u));
+  z-index: 1;
+  display: flex;
+  gap: calc(6 * var(--u));
+  pointer-events: none;
+}
+.c-stars img {
+  display: block;
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+
+/* Title row (37px) */
+.c-title {
+  flex: none;
+  height: calc(37 * var(--u));
+  margin: 0;
+  display: flex;
+  align-items: center;
+  color: var(--c-title-color);
+  font: 400 calc(var(--title-size) * var(--u)) / calc(37 * var(--u)) PicNic, Georgia, serif;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-wrap: nowrap;
+}
+
+/* Description box (300 × 100) */
+.c-desc {
+  flex: none;
+  height: calc(100 * var(--u));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: calc(8 * var(--u));
+  border: calc(1 * var(--u)) solid var(--c-box-border);
+  border-radius: calc(6 * var(--u));
+  background: var(--c-box);
+}
+.c-desc p {
+  margin: 0;
+  color: var(--c-body);
+  font: 400 calc(22 * var(--u)) / calc(26 * var(--u)) Squarevetica, system-ui, sans-serif;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Holo glare: only on Rare and Legendary cards, and only while you tilt them */
+.c-foil {
+  position: absolute;
+  inset: calc(-2 * var(--u));
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg,
+      transparent 20%,
+      rgb(255 80 180 / 0.55) 36%,
+      rgb(80 230 255 / 0.55) 48%,
+      rgb(255 240 90 / 0.5) 60%,
+      transparent 76%);
+  background-size: 260% 260%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: color-dodge;
+  opacity: 0;
+  transition: opacity 300ms var(--ease);
+}
+.card:not([data-rarity="common"]).is-tilting .c-foil { opacity: 0.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card-tilt, .card.is-tilting .card-tilt { transition: none; transform: none; }
+  .c-flash.is-on { animation: none; }
+  .screen:not([hidden]) { animation: none; }
+}
